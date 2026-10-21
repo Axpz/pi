@@ -12,6 +12,7 @@ import type {
 const NON_VISION_USER_IMAGE_PLACEHOLDER = "(image omitted: model does not support images)";
 const NON_VISION_TOOL_IMAGE_PLACEHOLDER = "(tool image omitted: model does not support images)";
 const ERROR_TOOL_IMAGE_PLACEHOLDER = "(image attached after the tool results)";
+const MISSING_TOOL_CALL_PLACEHOLDER = "No tool call provided. No tool was executed.";
 
 /** An error tool result split into a text-only result and the images to send after the tool results. */
 export interface SplitErrorToolResult {
@@ -176,7 +177,7 @@ export function transformMessages<TApi extends Api>(
 		return msg;
 	});
 
-	// Second pass: insert synthetic empty tool results for orphaned tool calls
+	// Second pass: supply missing tool results and feedback for tool use without calls.
 	// This preserves thinking signatures and satisfies API requirements
 	const result: Message[] = [];
 	let pendingToolCalls: ToolCall[] = [];
@@ -231,6 +232,13 @@ export function transformMessages<TApi extends Api>(
 			}
 
 			result.push(msg);
+			if (assistantMsg.stopReason === "toolUse" && toolCalls.length === 0) {
+				// No call ID exists to answer. Add request-only feedback, like synthetic tool results.
+				const next = transformed[i + 1];
+				if (next?.role !== "user" || next.content !== MISSING_TOOL_CALL_PLACEHOLDER) {
+					result.push({ role: "user", content: MISSING_TOOL_CALL_PLACEHOLDER, timestamp: assistantMsg.timestamp });
+				}
+			}
 		} else if (msg.role === "toolResult") {
 			existingToolResultIds.add(msg.toolCallId);
 			result.push(msg);
