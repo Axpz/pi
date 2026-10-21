@@ -259,7 +259,8 @@ async function runLoop(
 			const toolCalls = message.content.filter((c) => c.type === "toolCall");
 
 			const toolResults: ToolResultMessage[] = [];
-			hasMoreToolCalls = false;
+			// An empty toolUse is unfinished; request-time normalization supplies the missing-call feedback.
+			hasMoreToolCalls = message.stopReason === "toolUse" && !signal?.aborted;
 			if (toolCalls.length > 0) {
 				// A "length" stop means the output was cut off by the token limit, so
 				// every tool call in the message may carry truncated arguments. Fail
